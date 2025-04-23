@@ -10,7 +10,7 @@ from .utils import (
     optimize_with_ml,
     enforce_hard_constraints,
     tune_ecc_nsym,
-    encode_with_rs,
+    encode_with_rs, write_fasta_and_metadata
 )
 
 app = FastAPI()
@@ -52,13 +52,29 @@ async def upload_file(file: UploadFile = File(...)):
         dna_sequence_ecc = encode_with_rs(dna_sequence, nsym=nsym)
         validation = validate_dna_sequence(dna_sequence_ecc)
 
+        ml_params = {
+        "beam_width": 5,
+        "iterations": 10
+        }
+        storage = write_fasta_and_metadata(
+            dna_sequence=dna_sequence_ecc,
+            ecc_symbols=nsym,
+            ml_params=ml_params,
+            segment_size=100,
+            output_dir=os.path.join(UPLOAD_DIR, "storage", file.filename),
+            base_filename=os.path.splitext(file.filename)[0]
+        )
+
         return JSONResponse({
             "filename": file.filename,
             "dna_sequence": dna_sequence,
             "dna_sequence_ecc": dna_sequence_ecc,
             "length_bases": len(dna_sequence),
             "ecc_symbols": nsym,
-            "validation": validation
+            "validation": validation,
+            "fasta_file": storage["fasta_path"],
+            "metadata_file": storage["metadata_path"],
+            "metadata": storage["metadata"]
         })
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
