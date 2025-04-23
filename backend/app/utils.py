@@ -3,6 +3,11 @@ import re
 import random
 import math
 from reedsolo import RSCodec
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
+from Bio import SeqIO
+import json
+import os
 
 def normalize_to_byte_array(content: bytes) -> bytearray:
     return bytearray(content)
@@ -179,3 +184,45 @@ def tune_ecc_nsym(dna_length: int, target_error_rate: float = 0.01) -> int:
     estimated = math.ceil(dna_length * target_error_rate * 2)
     max_possible = dna_length - 1
     return min(estimated, max_possible)
+
+def write_fasta_and_metadata(
+    dna_sequence: str,
+    ecc_symbols: int,
+    ml_params: dict,
+    segment_size: int,
+    output_dir: str,
+    base_filename: str
+) -> dict:
+    os.makedirs(output_dir, exist_ok=True)
+    fasta_path = os.path.join(output_dir, f"{base_filename}.fasta")
+    meta_path  = os.path.join(output_dir, f"{base_filename}_metadata.json")
+    
+    records = []
+    metadata = {
+        "segments": [],
+        "ecc_symbols": ecc_symbols,
+        "ml_params": ml_params,
+        "segment_size": segment_size
+    }
+
+    for idx in range(0, len(dna_sequence), segment_size):
+        seg_seq = dna_sequence[idx : idx + segment_size]
+        seg_id  = f"{base_filename}_seg{idx//segment_size}"
+        records.append(SeqRecord(Seq(seg_seq), id=seg_id, description=""))
+        metadata["segments"].append({
+            "id": seg_id,
+            "start": idx,
+            "length": len(seg_seq)
+        })
+
+    with open(fasta_path, "w") as fasta_file:
+        SeqIO.write(records, fasta_file, "fasta")
+
+    with open(meta_path, "w") as meta_file:
+        json.dump(metadata, meta_file, indent=2)
+
+    return {
+        "fasta_path": fasta_path,
+        "metadata_path": meta_path,
+        "metadata": metadata
+    }
