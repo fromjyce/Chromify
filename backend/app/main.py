@@ -7,6 +7,8 @@ from .utils import (
     chunk_bitstring,
     optimize_dna_sequence,
     validate_dna_sequence,
+    optimize_with_ml,
+    enforce_hard_constraints
 )
 
 app = FastAPI()
@@ -27,14 +29,18 @@ async def upload_file(file: UploadFile = File(...)):
     bit_str = bytes_to_bitstring(byte_array)
     chunks = chunk_bitstring(bit_str, chunk_size=2)
     dna_sequence = optimize_dna_sequence(chunks, max_homopolymer=3)
+    dna_sequence = optimize_with_ml(
+        dna_sequence,
+        segment_size=100,
+        beam_width=5,
+        iterations=10
+    )
+    dna_sequence = enforce_hard_constraints(dna_sequence, max_homopolymer=3)
     validation = validate_dna_sequence(dna_sequence)
 
-    return JSONResponse(
-        content={
-            "filename": file.filename,
-            "dna_sequence": dna_sequence,
-            "length_bases": len(dna_sequence),
-            "validation": validation
-        },
-        status_code=200,
-    )
+    return JSONResponse({
+        "filename": file.filename,
+        "dna_sequence": dna_sequence,
+        "length_bases": len(dna_sequence),
+        "validation": validation
+    })
