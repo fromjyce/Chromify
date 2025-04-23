@@ -226,3 +226,39 @@ def write_fasta_and_metadata(
         "metadata_path": meta_path,
         "metadata": metadata
     }
+
+def simulate_synthesis_errors(
+    dna_sequence: str,
+    sub_rate: float = 0.005,
+    ins_rate: float = 0.002,
+    del_rate: float = 0.002
+) -> str:
+    bases = ["A", "C", "G", "T"]
+    corrupted = []
+    for base in dna_sequence:
+        r = random.random()
+        if r < del_rate:
+            continue
+        r -= del_rate
+        if r < ins_rate:
+            corrupted.append(random.choice(bases))
+        r -= ins_rate
+        if r < sub_rate:
+            alt = random.choice([b for b in bases if b != base])
+            corrupted.append(alt)
+        else:
+            corrupted.append(base)
+    return "".join(corrupted)
+
+def simulate_strand_loss(
+    dna_sequence: str,
+    segment_size: int,
+    loss_rate: float = 0.1
+) -> str:
+    degraded = []
+    for i in range(0, len(dna_sequence), segment_size):
+        segment = dna_sequence[i : i + segment_size]
+        if random.random() < loss_rate:
+            continue
+        degraded.append(segment)
+    return "".join(degraded)
