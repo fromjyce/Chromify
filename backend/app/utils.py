@@ -61,22 +61,16 @@ def optimize_dna_sequence(
     max_homopolymer: int = 3
 ) -> str:
     dna_seq = []
-    # Track current run
     last_base = None
     run_length = 0
 
     for bits in chunks:
         base = BIT_TO_BASE[bits]
-
-        # Check if adding this base would exceed the allowed run
         if base == last_base and run_length >= max_homopolymer:
-            # Pick the next alternate base (simple round robin)
             for alt in ALTERNATE_BASES[base]:
-                # Only accept an alternate that breaks the run
                 if alt != last_base:
                     base = alt
                     break
-        # Append and update run tracking
         dna_seq.append(base)
         if base == last_base:
             run_length += 1
