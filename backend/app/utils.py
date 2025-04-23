@@ -1,4 +1,7 @@
-from typing import List
+from typing import List, Dict
+import re
+import random
+from copy import deepcopy
 
 def normalize_to_byte_array(content: bytes) -> bytearray:
     return bytearray(content)
@@ -79,3 +82,74 @@ def optimize_dna_sequence(
             run_length = 1
 
     return "".join(dna_seq)
+
+def max_homopolymer_run(dna_seq: str) -> int:
+    runs = re.findall(r"(A+|C+|G+|T+)", dna_seq)
+    return max((len(run) for run in runs), default=0)
+
+def extract_segment_features(dna_seq: str) -> Dict[str, float]:
+    return {
+        "gc_content": calculate_gc_content(dna_seq),
+        "max_homopolymer": float(max_homopolymer_run(dna_seq)),
+        "secondary_structure_score": 0.0,  # placeholder
+    }
+class SequenceSuccessModel:
+    def predict_proba(self, features: Dict[str, float]) -> float:
+        gc_score = max(0, 1 - abs(features["gc_content"] - 50) / 50)
+        hp_score = max(0, 1 - (features["max_homopolymer"] - 1) / 10)
+        return 0.5 * gc_score + 0.5 * hp_score
+
+def optimize_with_ml(
+    dna_sequence: str,
+    segment_size: int = 100,
+    beam_width: int = 3,
+    iterations: int = 5
+) -> str:
+    model = SequenceSuccessModel()
+    optimized = list(dna_sequence)
+
+    for seg_start in range(0, len(dna_sequence), segment_size):
+        seg_end = min(seg_start + segment_size, len(dna_sequence))
+        segment = dna_sequence[seg_start:seg_end]
+        beam = [segment]
+
+        for _ in range(iterations):
+            candidates = []
+            for seq_variant in beam:
+                for _ in range(beam_width):
+                    pos = random.randrange(len(seq_variant))
+                    orig_base = seq_variant[pos]
+                    alt_base = random.choice(ALTERNATE_BASES[orig_base])
+                    mutated = list(seq_variant)
+                    mutated[pos] = alt_base
+                    candidates.append("".join(mutated))
+            scored = [(model.predict_proba(extract_segment_features(seq)), seq) 
+                      for seq in candidates]
+            scored.sort(key=lambda x: x[0], reverse=True)
+            beam = [seq for _, seq in scored[:beam_width]]
+        best_segment = beam[0]
+        optimized[seg_start:seg_end] = list(best_segment)
+
+    return "".join(optimized)
+
+def enforce_hard_constraints(
+    dna_sequence: str,
+    max_homopolymer: int = 3
+) -> str:
+    seq_list = list(dna_sequence)
+    run_base = seq_list[0]
+    run_start = 0
+
+    for i in range(1, len(seq_list)+1):
+        if i < len(seq_list) and seq_list[i] == run_base:
+            continue
+        run_length = i - run_start
+        if run_length > max_homopolymer:
+            break_pos = run_start + run_length // 2
+            orig = seq_list[break_pos]
+            seq_list[break_pos] = next(b for b in ALTERNATE_BASES[orig] if b != orig)
+        if i < len(seq_list):
+            run_base = seq_list[i]
+            run_start = i
+
+    return "".join(seq_list)
