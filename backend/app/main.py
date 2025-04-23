@@ -1,7 +1,13 @@
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 import os
-from .utils import normalize_to_byte_array, bytes_to_bitstring, chunk_bitstring, bit_chunks_to_dna
+from .utils import (
+    normalize_to_byte_array,
+    bytes_to_bitstring,
+    chunk_bitstring,
+    optimize_dna_sequence,
+    validate_dna_sequence,
+)
 
 app = FastAPI()
 
@@ -18,18 +24,17 @@ async def upload_file(file: UploadFile = File(...)):
         f.write(content)
 
     byte_array = normalize_to_byte_array(content)
-
     bit_str = bytes_to_bitstring(byte_array)
-
     chunks = chunk_bitstring(bit_str, chunk_size=2)
-
-    dna_sequence = bit_chunks_to_dna(chunks)
+    dna_sequence = optimize_dna_sequence(chunks, max_homopolymer=3)
+    validation = validate_dna_sequence(dna_sequence)
 
     return JSONResponse(
         content={
             "filename": file.filename,
             "dna_sequence": dna_sequence,
             "length_bases": len(dna_sequence),
+            "validation": validation
         },
         status_code=200,
     )
