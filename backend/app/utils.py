@@ -1,7 +1,8 @@
 from typing import List, Dict
 import re
 import random
-from copy import deepcopy
+import math
+from reedsolo import RSCodec
 
 def normalize_to_byte_array(content: bytes) -> bytearray:
     return bytearray(content)
@@ -91,7 +92,7 @@ def extract_segment_features(dna_seq: str) -> Dict[str, float]:
     return {
         "gc_content": calculate_gc_content(dna_seq),
         "max_homopolymer": float(max_homopolymer_run(dna_seq)),
-        "secondary_structure_score": 0.0,  # placeholder
+        "secondary_structure_score": 0.0,
     }
 class SequenceSuccessModel:
     def predict_proba(self, features: Dict[str, float]) -> float:
@@ -153,3 +154,28 @@ def enforce_hard_constraints(
             run_start = i
 
     return "".join(seq_list)
+
+def encode_with_rs(dna_sequence: str, nsym: int = 10) -> str:
+    if len(dna_sequence) < 2:
+        return dna_sequence
+    
+    base_map = {"A": 0, "C": 1, "G": 2, "T": 3}
+    try:
+        data = bytes([base_map[b] for b in dna_sequence])
+        max_possible_nsym = len(data) - 1
+        nsym = min(nsym, max_possible_nsym) if max_possible_nsym > 0 else 1
+        
+        rsc = RSCodec(nsym)
+        encoded = rsc.encode(data)
+        bits = "".join(f"{byte:08b}" for byte in encoded)
+        chunks = chunk_bitstring(bits, 2)
+        return bit_chunks_to_dna(chunks)
+    except Exception:
+        return dna_sequence
+
+def tune_ecc_nsym(dna_length: int, target_error_rate: float = 0.01) -> int:
+    if dna_length <= 1:
+        return 0
+    estimated = math.ceil(dna_length * target_error_rate * 2)
+    max_possible = dna_length - 1
+    return min(estimated, max_possible)
