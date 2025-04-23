@@ -10,7 +10,9 @@ from .utils import (
     optimize_with_ml,
     enforce_hard_constraints,
     tune_ecc_nsym,
-    encode_with_rs, write_fasta_and_metadata
+    encode_with_rs, write_fasta_and_metadata,
+    simulate_synthesis_errors,
+    simulate_strand_loss,
 )
 
 app = FastAPI()
@@ -64,6 +66,20 @@ async def upload_file(file: UploadFile = File(...)):
             output_dir=os.path.join(UPLOAD_DIR, "storage", file.filename),
             base_filename=os.path.splitext(file.filename)[0]
         )
+        errored_sequence = simulate_synthesis_errors(
+            dna_sequence_ecc,
+            sub_rate=0.005,
+            ins_rate=0.002,
+            del_rate=0.002
+        )
+
+        degraded_sequence = simulate_strand_loss(
+        errored_sequence,
+        segment_size=100,
+        loss_rate=0.1
+    )
+        
+        degraded_validation = validate_dna_sequence(degraded_sequence)
 
         return JSONResponse({
             "filename": file.filename,
@@ -72,9 +88,11 @@ async def upload_file(file: UploadFile = File(...)):
             "length_bases": len(dna_sequence),
             "ecc_symbols": nsym,
             "validation": validation,
-            "fasta_file": storage["fasta_path"],
-            "metadata_file": storage["metadata_path"],
-            "metadata": storage["metadata"]
+            # "fasta_file": storage["fasta_path"],
+            # "metadata_file": storage["metadata_path"],
+            # "metadata": storage["metadata"]
+            "degraded_sequence": degraded_sequence,
+            "degraded_validation": degraded_validation,
         })
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
